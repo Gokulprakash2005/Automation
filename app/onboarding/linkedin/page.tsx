@@ -9,18 +9,7 @@ export default function ConnectLinkedIn() {
 
   const handleSendMessage = async () => {
     try {
-      // Try to communicate directly with extension
-      if (typeof chrome !== 'undefined' && chrome.runtime) {
-        chrome.runtime.sendMessage('ieigalmhmnhikodnabhhmlbniheheeae', {
-          type: 'SEND_MESSAGE',
-          payload: { profileUrl, message }
-        });
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 3000);
-        return;
-      }
-      
-      // Fallback to API call
+      // Always call API first to save to database
       const response = await fetch('/api/linkedin/send-message', {
         method: 'POST',
         headers: {
@@ -30,6 +19,16 @@ export default function ConnectLinkedIn() {
       });
       
       if (response.ok) {
+        console.log('Message saved to database');
+        
+        // Then try to communicate with extension
+        if (typeof chrome !== 'undefined' && chrome.runtime) {
+          chrome.runtime.sendMessage('ieigalmhmnhikodnabhhmlbniheheeae', {
+            type: 'SEND_MESSAGE',
+            payload: { profileUrl, message }
+          });
+        }
+        
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
       }

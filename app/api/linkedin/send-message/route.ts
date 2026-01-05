@@ -1,3 +1,5 @@
+import { prisma } from '../../../../lib/prisma';
+
 // Store extension connection
 let extensionId = null;
 
@@ -7,6 +9,52 @@ export async function POST(req: Request) {
   console.log('Send message request:');
   console.log('Profile URL:', profileUrl);
   console.log('Message:', message);
+  console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+  
+  try {
+    // Find or create Lead
+    const lead = await prisma.lead.upsert({
+      where: { profileUrl },
+      update: {},
+      create: {
+        profileUrl,
+        name: 'Unknown', // Will be updated later when we get the name
+        status: 'NEW'
+      }
+    });
+    
+    // Find or create Conversation
+    const conversation = await prisma.conversation.upsert({
+      where: {
+        leadId_channel: {
+          leadId: lead.id,
+          channel: 'LINKEDIN'
+        }
+      },
+      update: {
+        lastMessageAt: new Date()
+      },
+      create: {
+        leadId: lead.id,
+        channel: 'LINKEDIN',
+        lastMessageAt: new Date()
+      }
+    });
+    
+    // Store outgoing message
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        sender: 'USER',
+        content: message
+      }
+    });
+    
+    console.log('Message saved to database');
+    
+  } catch (error) {
+    console.error('Database error:', error);
+  }
   
   // Send command to extension via runtime messaging
   if (extensionId) {

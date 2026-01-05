@@ -1,0 +1,59 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model LinkedInAccount {
+  id                  String   @id @default(cuid())
+  status              String   @default("ACTIVE")
+  healthScore         Int      @default(100)
+  dailyMessageCount   Int      @default(0)
+  createdAt           DateTime @default(now())
+  
+  @@map("linkedin_accounts")
+}
+
+model Lead {
+  id          String   @id @default(cuid())
+  profileUrl  String   @unique
+  name        String?
+  status      String   @default("NEW")
+  createdAt   DateTime @default(now())
+  
+  conversations Conversation[]
+  
+  @@map("leads")
+}
+
+model Conversation {
+  id            String    @id @default(cuid())
+  leadId        String
+  channel       String    @default("LINKEDIN")
+  lastMessageAt DateTime?
+  createdAt     DateTime  @default(now())
+  
+  lead     Lead      @relation(fields: [leadId], references: [id])
+  messages Message[]
+  
+  @@unique([leadId, channel])
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  sender         String   // USER, LEAD, AI
+  content        String
+  createdAt      DateTime @default(now())
+  
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  
+  @@map("messages")
+}

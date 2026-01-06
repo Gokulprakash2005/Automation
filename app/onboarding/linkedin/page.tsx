@@ -2,6 +2,17 @@
 
 import { useState } from 'react';
 
+// Chrome extension type declaration
+declare global {
+  interface Window {
+    chrome?: {
+      runtime?: {
+        sendMessage: (extensionId: string, message: any) => void;
+      };
+    };
+  }
+}
+
 export default function ConnectLinkedIn() {
   const [profileUrl, setProfileUrl] = useState('');
   const [message, setMessage] = useState('');
@@ -22,8 +33,8 @@ export default function ConnectLinkedIn() {
         console.log('Message saved to database');
         
         // Then try to communicate with extension
-        if (typeof chrome !== 'undefined' && chrome.runtime) {
-          chrome.runtime.sendMessage('ieigalmhmnhikodnabhhmlbniheheeae', {
+        if (typeof window !== 'undefined' && window.chrome?.runtime) {
+          window.chrome.runtime.sendMessage('ieigalmhmnhikodnabhhmlbniheheeae', {
             type: 'SEND_MESSAGE',
             payload: { profileUrl, message }
           });

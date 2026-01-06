@@ -10,16 +10,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model LinkedInAccount {
-  id                  String   @id @default(cuid())
-  status              String   @default("ACTIVE")
-  healthScore         Int      @default(100)
-  dailyMessageCount   Int      @default(0)
-  createdAt           DateTime @default(now())
-  
-  @@map("linkedin_accounts")
-}
-
 model Lead {
   id          String   @id @default(cuid())
   profileUrl  String   @unique
@@ -49,7 +39,7 @@ model Conversation {
 model Message {
   id             String   @id @default(cuid())
   conversationId String
-  sender         String   // USER, LEAD, AI
+  sender         String   // OUTGOING, INCOMING
   content        String
   createdAt      DateTime @default(now())
   

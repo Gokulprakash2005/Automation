@@ -1,5 +1,20 @@
 import { prisma } from '../../../../lib/prisma';
 
+// Extract name from LinkedIn profile URL
+function extractNameFromUrl(profileUrl: string): string {
+  const match = profileUrl.match(/\/in\/([^\/?]+)/);
+  if (match) {
+    const profileId = match[1];
+    // Convert LinkedIn profile ID to readable name
+    if (profileId.includes('-')) {
+      return profileId.split('-').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' ');
+    }
+  }
+  return 'Unknown';
+}
+
 // Normalize LinkedIn profile URLs to handle different formats
 function normalizeLinkedInUrl(url: string): string {
   if (!url) return url;
@@ -31,16 +46,39 @@ export async function POST(req: Request) {
   console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
   
   try {
-    // Find or create Lead (reuse existing if profileUrl exists)
-    const lead = await prisma.lead.upsert({
-      where: { profileUrl: normalizedProfileUrl },
-      update: {}, // Don't update existing lead
-      create: {
-        profileUrl: normalizedProfileUrl,
-        name: 'Unknown',
-        status: 'NEW'
-      }
+    // Find or create Lead - check by name first, then by URL
+    const extractedName = extractNameFromUrl(normalizedProfileUrl);
+    
+    // First try to find existing lead by name (to merge different URLs for same person)
+    let lead = await prisma.lead.findFirst({
+      where: { name: extractedName }
     });
+    
+    if (lead) {
+      console.log('🔄 Found existing lead by name:', extractedName);
+      // Update with better URL if current one is vanity URL and existing is internal ID
+      const currentIsVanity = !normalizedProfileUrl.includes('ACoAA');
+      const existingIsInternal = lead.profileUrl.includes('ACoAA');
+      
+      if (currentIsVanity && existingIsInternal) {
+        lead = await prisma.lead.update({
+          where: { id: lead.id },
+          data: { profileUrl: normalizedProfileUrl }
+        });
+        console.log('🔄 Updated lead URL to vanity URL:', normalizedProfileUrl);
+      }
+    } else {
+      // If not found by name, try by URL, then create if needed
+      lead = await prisma.lead.upsert({
+        where: { profileUrl: normalizedProfileUrl },
+        update: {}, // Don't update existing lead
+        create: {
+          profileUrl: normalizedProfileUrl,
+          name: extractedName,
+          status: 'NEW'
+        }
+      });
+    }
     
     // Find existing conversation using leadId + channel
     let conversation = await prisma.conversation.findUnique({

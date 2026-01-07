@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 
 // Chrome extension type declaration
 declare global {
@@ -73,6 +74,12 @@ export default function ConnectLinkedIn() {
             <button className="w-full bg-gray-100 text-gray-900 px-8 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-colors">
               I've installed it
             </button>
+            <Link 
+              href="/conversations"
+              className="w-full bg-green-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors text-center block"
+            >
+              View Conversations
+            </Link>
           </div>
         </div>
 

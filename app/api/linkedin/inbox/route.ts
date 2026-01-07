@@ -50,11 +50,23 @@ export async function POST(req: Request) {
       
       if (lead) {
         console.log('🔄 Found existing lead by name:', name);
-        // Update the lead with the internal profile URL if needed
-        lead = await prisma.lead.update({
-          where: { id: lead.id },
-          data: { name: name }
-        });
+        // Update with better URL if current one is vanity URL and existing is internal ID
+        const currentIsVanity = !normalizedProfileUrl.includes('ACoAA');
+        const existingIsInternal = lead.profileUrl.includes('ACoAA');
+        
+        if (currentIsVanity && existingIsInternal) {
+          lead = await prisma.lead.update({
+            where: { id: lead.id },
+            data: { profileUrl: normalizedProfileUrl, name: name }
+          });
+          console.log('🔄 Updated lead URL to vanity URL:', normalizedProfileUrl);
+        } else {
+          // Just update the name
+          lead = await prisma.lead.update({
+            where: { id: lead.id },
+            data: { name: name }
+          });
+        }
       }
     }
     
@@ -73,7 +85,8 @@ export async function POST(req: Request) {
       });
     }
     
-    // Check if this exact message already exists to prevent duplicates
+    // Check if this exact message already exists within the last 5 minutes to prevent duplicates
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     const existingMessage = await prisma.message.findFirst({
       where: {
         conversation: {
@@ -81,7 +94,10 @@ export async function POST(req: Request) {
           channel: 'LINKEDIN'
         },
         content: message,
-        sender: 'INCOMING'
+        sender: 'INCOMING',
+        createdAt: {
+          gte: fiveMinutesAgo
+        }
       },
       orderBy: {
         createdAt: 'desc'
@@ -132,7 +148,12 @@ export async function POST(req: Request) {
     }
     
     // Always create a new Message (Message.id is always new)
-    await prisma.message.create({
+    console.log('🔄 Creating message in database...');
+    console.log('Conversation ID:', conversation.id);
+    console.log('Message content:', message);
+    console.log('Sender:', 'INCOMING');
+    
+    const newMessage = await prisma.message.create({
       data: {
         conversationId: conversation.id,
         sender: 'INCOMING',
@@ -141,6 +162,7 @@ export async function POST(req: Request) {
       }
     });
     
+    console.log('✅ MESSAGE CREATED WITH ID:', newMessage.id);
     console.log('✅ MESSAGE SAVED TO DATABASE\n');
     
     return Response.json({ 
@@ -155,10 +177,16 @@ export async function POST(req: Request) {
     });
     
   } catch (error) {
-    console.error('Error saving incoming message:', error);
+    console.error('❌ Error saving incoming message:', error);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
     return Response.json({ 
       status: 'error',
-      message: 'Failed to save incoming message'
+      message: 'Failed to save incoming message',
+      error: error.message
     }, { 
       status: 500,
       headers: {

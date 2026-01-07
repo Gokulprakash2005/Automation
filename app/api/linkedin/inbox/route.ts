@@ -43,25 +43,24 @@ export async function POST(req: Request) {
     const profileId = normalizedProfileUrl.match(/\/in\/([^\/?]+)/)?.[1];
     
     if (profileId?.startsWith('ACoAA') && name) {
-      // For LinkedIn internal IDs, try to find existing lead by name first
+      // For LinkedIn internal IDs, try to find existing lead by name OR URL pattern
       lead = await prisma.lead.findFirst({
-        where: { name: name }
+        where: {
+          OR: [
+            { name: name },
+            { name: { contains: name.split(' ')[0] } }, // Match by first name
+            { profileUrl: normalizedProfileUrl }
+          ]
+        }
       });
       
       if (lead) {
-        console.log('🔄 Found existing lead by name:', name);
-        // Update with better URL if current one is vanity URL and existing is internal ID
-        const currentIsVanity = !normalizedProfileUrl.includes('ACoAA');
-        const existingIsInternal = lead.profileUrl.includes('ACoAA');
+        console.log('🔄 Found existing lead by name/pattern:', name);
+        // Don't update URL if existing one is better (vanity URL)
+        const currentIsInternal = normalizedProfileUrl.includes('ACoAA');
+        const existingIsVanity = !lead.profileUrl.includes('ACoAA');
         
-        if (currentIsVanity && existingIsInternal) {
-          lead = await prisma.lead.update({
-            where: { id: lead.id },
-            data: { profileUrl: normalizedProfileUrl, name: name }
-          });
-          console.log('🔄 Updated lead URL to vanity URL:', normalizedProfileUrl);
-        } else {
-          // Just update the name
+        if (!currentIsInternal || !existingIsVanity) {
           lead = await prisma.lead.update({
             where: { id: lead.id },
             data: { name: name }

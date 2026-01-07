@@ -46,24 +46,34 @@ export async function POST(req: Request) {
   console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
   
   try {
-    // Find or create Lead - check by name first, then by URL
+    // Find or create Lead - check by name first, then by URL pattern
     const extractedName = extractNameFromUrl(normalizedProfileUrl);
     
-    // First try to find existing lead by name (to merge different URLs for same person)
+    // First try to find existing lead by name OR by any URL pattern for same person
     let lead = await prisma.lead.findFirst({
-      where: { name: extractedName }
+      where: {
+        OR: [
+          { name: extractedName },
+          { profileUrl: normalizedProfileUrl },
+          // Also check if there's a lead with same name but different URL format
+          { name: { contains: extractedName.split(' ')[0] } } // Match by first name
+        ]
+      }
     });
     
     if (lead) {
-      console.log('🔄 Found existing lead by name:', extractedName);
-      // Update with better URL if current one is vanity URL and existing is internal ID
+      console.log('🔄 Found existing lead:', lead.name, 'URL:', lead.profileUrl);
+      // Always update to use the better URL (vanity over internal ID)
       const currentIsVanity = !normalizedProfileUrl.includes('ACoAA');
       const existingIsInternal = lead.profileUrl.includes('ACoAA');
       
       if (currentIsVanity && existingIsInternal) {
         lead = await prisma.lead.update({
           where: { id: lead.id },
-          data: { profileUrl: normalizedProfileUrl }
+          data: { 
+            profileUrl: normalizedProfileUrl,
+            name: extractedName
+          }
         });
         console.log('🔄 Updated lead URL to vanity URL:', normalizedProfileUrl);
       }
